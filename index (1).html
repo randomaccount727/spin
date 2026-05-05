@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Spin Challenge</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #0a0a0a;
+            color: #00ff41;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Stats Bar */
+        .stats-container {
+            position: fixed;
+            top: 20px;
+            display: flex;
+            gap: 30px;
+            background: rgba(0, 255, 65, 0.1);
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: 1px solid #00ff41;
+            z-index: 10;
+        }
+
+        .stat-box span { display: block; text-align: center; }
+        .label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.8; }
+        .value { font-size: 1.8rem; font-weight: bold; min-width: 60px; }
+
+        /* The Spinning Image */
+        #image-container {
+            perspective: 1000px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        img {
+            max-width: 70vw;
+            max-height: 60vh;
+            border: 5px solid #00ff41;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+            transition: box-shadow 0.1s ease;
+        }
+
+        /* Initial Setup Box */
+        #upload-box {
+            background: #222;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px dashed #00ff41;
+        }
+
+        /* Persistent Change Button */
+        #change-btn {
+            position: fixed;
+            bottom: 20px;
+            background: #222;
+            color: #00ff41;
+            border: 1px solid #00ff41;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none; /* Hidden until first upload */
+            font-family: inherit;
+        }
+
+        #change-btn:hover { background: #00ff41; color: #000; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="stats-container">
+        <div class="stat-box">
+            <span class="label">CPS</span>
+            <span id="cps-val" class="value">0</span>
+        </div>
+        <div class="stat-box">
+            <span class="label">RPM</span>
+            <span id="rpm-val" class="value">0</span>
+        </div>
+        <div class="stat-box" style="color: gold;">
+            <span class="label">Best</span>
+            <span id="high-score" class="value">0</span>
+        </div>
+    </div>
+
+    <div id="upload-box">
+        <h2 style="margin-top:0">Upload to Start</h2>
+        <input type="file" id="upload-init" accept="image/*">
+    </div>
+
+    <div id="image-container">
+        <img id="display-img" src="" alt="Spinning Image">
+    </div>
+
+    <button id="change-btn">CHANGE IMAGE</button>
+    <input type="file" id="upload-hidden" accept="image/*" class="hidden">
+
+    <script>
+        const img = document.getElementById('display-img');
+        const uploadInit = document.getElementById('upload-init');
+        const uploadHidden = document.getElementById('upload-hidden');
+        const uploadBox = document.getElementById('upload-box');
+        const changeBtn = document.getElementById('change-btn');
+        
+        const cpsDisplay = document.getElementById('cps-val');
+        const rpmDisplay = document.getElementById('rpm-val');
+        const highScoreDisplay = document.getElementById('high-score');
+
+        let rotation = 0;
+        let velocity = 0;
+        let clickTimes = [];
+        let highScore = localStorage.getItem('spinHighScore') || 0;
+
+        highScoreDisplay.innerText = highScore;
+
+        // Function to process file
+        function handleFile(file) {
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    uploadBox.classList.add('hidden');
+                    changeBtn.style.display = 'block';
+                    velocity = 0; // Reset speed on new image
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Event Listeners for Uploads
+        uploadInit.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        uploadHidden.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        
+        // Trigger hidden file input when "Change" is clicked
+        changeBtn.addEventListener('click', () => uploadHidden.click());
+
+        // Physics Click
+        img.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            velocity += 7; 
+            clickTimes.push(Date.now());
+        });
+
+        function update() {
+            rotation += velocity;
+            img.style.transform = `rotate(${rotation}deg)`;
+
+            // Natural Friction
+            velocity *= 0.985; 
+            if (velocity < 0.01) velocity = 0;
+
+            // Stats
+            let rpm = Math.round((velocity * 60 / 360) * 60);
+            rpmDisplay.innerText = rpm;
+
+            if (rpm > highScore) {
+                highScore = rpm;
+                highScoreDisplay.innerText = highScore;
+                localStorage.setItem('spinHighScore', highScore);
+            }
+
+            // Visual Juice (Glow based on speed)
+            const glow = Math.min(velocity * 2, 50); 
+            img.style.boxShadow = `0 0 ${glow}px rgba(0, 255, 65, ${glow/50})`;
+
+            // CPS logic
+            const now = Date.now();
+            clickTimes = clickTimes.filter(t => now - t < 1000);
+            cpsDisplay.innerText = clickTimes.length;
+
+            requestAnimationFrame(update);
+        }
+
+        update();
+    </script>
+</body>
+</html>
